@@ -32,9 +32,15 @@ export type BulkString = string;
 export type BulkNil = undefined;
 
 /**
- * @description Represents the some type in the RESP2 protocol.
+ * @description Represents the some type in the RESP2/RESP3 protocol.
  */
-export type Raw = SimpleString | Integer | Bulk | ConditionalArray;
+export type Raw =
+  | SimpleString
+  | Integer
+  | Bulk
+  | ConditionalArray
+  | ConditionalMap
+  | ConditionalSet;
 
 export type Binary = Uint8Array;
 
@@ -43,11 +49,24 @@ export type Binary = Uint8Array;
  */
 export type ConditionalArray = Raw[];
 
+/**
+ * @description Represents the type of the value returned by `MapReply#map()`.
+ */
+export type ConditionalMap = Map<Raw, Raw>;
+
+/**
+ * @description Represents the type of the value returned by `SetReply#set()`.
+ */
+export type ConditionalSet = Set<Raw>;
+
 export type RedisReply =
   | IntegerReply
   | BulkReply
   | SimpleStringReply
-  | ArrayReply;
+  | ArrayReply
+  // RESP3
+  | MapReply
+  | SetReply;
 
 export type RedisReplyOrError = RedisReply | ErrorReplyError;
 
@@ -88,4 +107,19 @@ export interface SimpleStringReply extends Reply<SimpleString> {
 export interface ArrayReply extends Reply<ConditionalArray> {
   type: "array";
   value(): ConditionalArray;
+}
+
+/**
+ * @description Represents the **map** reply in the RESP3 protocol.
+ */
+export interface MapReply extends Reply<ConditionalArray> {
+  type: "map";
+  value(): ConditionalArray;
+  map(): ConditionalMap;
+}
+
+export interface SetReply extends Reply<ConditionalArray> {
+  type: "set";
+  value(): ConditionalArray;
+  set(): ConditionalSet;
 }

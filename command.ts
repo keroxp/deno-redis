@@ -223,6 +223,7 @@ export interface RedisCommands {
   ping(message: RedisValue): Promise<BulkString>;
   quit(): Promise<SimpleString>;
   select(index: number): Promise<SimpleString>;
+  hello(protover?: 2 | 3): Promise<ConditionalArray>;
 
   // Keys
   del(...keys: string[]): Promise<Integer>;

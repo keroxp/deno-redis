@@ -1290,6 +1290,14 @@ export class RedisImpl implements Redis {
     return this.execStatusReply("SELECT", index);
   }
 
+  hello(protover?: 2 | 3) {
+    const args = [] as RedisValue[];
+    if (protover != null) {
+      args.push(protover);
+    }
+    return this.execArrayReply("HELLO", ...args);
+  }
+
   set(
     key: string,
     value: RedisValue,

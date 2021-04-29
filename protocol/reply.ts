@@ -10,11 +10,16 @@ const SimpleStringCode = "+".charCodeAt(0);
 const ArrayReplyCode = "*".charCodeAt(0);
 const ErrorReplyCode = "-".charCodeAt(0);
 
+const MapReplyCode = "%".charCodeAt(0);
+const SetReplyCode = "~".charCodeAt(0);
+
 export const replyTypes = {
   Integer: "integer",
   SimpleString: "simple string",
   Array: "array",
   BulkString: "bulk string",
+  Map: "map",
+  Set: "set",
 } as const;
 
 export function unwrapReply(
@@ -52,6 +57,12 @@ export async function readReply(
       return await BulkReply.decode(reader);
     case ArrayReplyCode:
       return await ArrayReply.decode(reader);
+    /* Start of RESP3 part */
+    case MapReplyCode:
+      return await MapReply.decode(reader);
+    case SetReplyCode:
+      return await SetReply.decode(reader);
+    /* End of RESP3 part */
     case ErrorReplyCode:
       tryParseErrorReply(await readLine(reader));
   }
@@ -161,32 +172,8 @@ class ArrayReply implements types.ArrayReply {
     const argCount = parseInt(line.substr(1, line.length - 3));
     const result: types.ConditionalArray = [];
     for (let i = 0; i < argCount; i++) {
-      const res = await reader.peek(1);
-      if (res === null) {
-        throw new EOFError();
-      }
-      switch (res[0]) {
-        case SimpleStringCode: {
-          const reply = await SimpleStringReply.decode(reader);
-          result.push(reply.value());
-          break;
-        }
-        case BulkReplyCode: {
-          const reply = await BulkReply.decode(reader);
-          result.push(reply.value());
-          break;
-        }
-        case IntegerReplyCode: {
-          const reply = await IntegerReply.decode(reader);
-          result.push(reply.value());
-          break;
-        }
-        case ArrayReplyCode: {
-          const reply = await ArrayReply.decode(reader);
-          result.push(reply.value());
-          break;
-        }
-      }
+      const reply = await decodeReply(reader);
+      result.push(reply.value());
     }
     return new ArrayReply(result);
   }
@@ -197,6 +184,75 @@ class ArrayReply implements types.ArrayReply {
 
   value() {
     return this.#array;
+  }
+}
+
+class MapReply implements types.MapReply {
+  #fields: types.ConditionalArray;
+
+  constructor(fields: types.ConditionalArray) {
+    this.#fields = fields;
+  }
+
+  static async decode(reader: BufReader): Promise<types.MapReply> {
+    const line = await readLine(reader);
+    const entryCount = parseInt(line.substr(1, line.length - 3));
+    const result: types.ConditionalArray = [];
+    for (let i = 0; i < entryCount; i++) {
+      const keyReply = await decodeReply(reader);
+      const valueReply = await decodeReply(reader);
+      result.push(keyReply.value(), valueReply.value());
+    }
+    return new MapReply(result);
+  }
+
+  get type() {
+    return replyTypes.Map;
+  }
+
+  value() {
+    return this.#fields;
+  }
+
+  map(): types.ConditionalMap {
+    const map = new Map<types.Raw, types.Raw>();
+    for (let i = 0; i < this.#fields.length; i += 2) {
+      const key = this.#fields[i];
+      const value = this.#fields[i + 1];
+      map.set(key, value);
+    }
+    return map;
+  }
+}
+
+class SetReply implements types.SetReply {
+  #members: types.ConditionalArray;
+
+  constructor(members: types.ConditionalArray) {
+    this.#members = members;
+  }
+
+  static async decode(reader: BufReader): Promise<types.SetReply> {
+    const line = await readLine(reader);
+    const memberCount = parseInt(line.substr(1, line.length - 3));
+    const members = [] as types.ConditionalArray;
+    for (let i = 0; i < memberCount; i++) {
+      const member = await decodeReply(reader);
+      members.push(member.value());
+    }
+    return new SetReply(members);
+  }
+
+  value() {
+    return this.#members;
+  }
+
+  set() {
+    return new Set(this.#members);
+  }
+
+  get type() {
+    return replyTypes.Set;
   }
 }
 
@@ -223,6 +279,30 @@ async function readLine(reader: BufReader): Promise<string> {
       }
     }
     buf[loc++] = d;
+  }
+  throw new InvalidStateError();
+}
+
+async function decodeReply(reader: BufReader): Promise<types.RedisReply> {
+  const res = await reader.peek(1);
+  if (res === null) {
+    throw new EOFError();
+  }
+  switch (res[0]) {
+    case SimpleStringCode:
+      return SimpleStringReply.decode(reader);
+    case BulkReplyCode:
+      return BulkReply.decode(reader);
+    case IntegerReplyCode:
+      return IntegerReply.decode(reader);
+    case ArrayReplyCode:
+      return ArrayReply.decode(reader);
+    case MapReplyCode:
+      return MapReply.decode(reader);
+    case SetReplyCode:
+      return SetReply.decode(reader);
+    case ErrorReplyCode:
+      tryParseErrorReply(await readLine(reader));
   }
   throw new InvalidStateError();
 }

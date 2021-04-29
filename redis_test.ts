@@ -14,3 +14,4 @@ import "./tests/set_test.ts";
 import "./tests/sorted_set_test.ts";
 import "./tests/stream_test.ts";
 import "./tests/string_test.ts";
+import "./tests/resp3_test.ts";
