@@ -9,6 +9,7 @@ export type {
   Integer,
   IntegerReply,
   Raw,
+  RawOrError,
   RedisReply,
   RedisReplyOrError,
   RedisValue,
@@ -25,4 +26,4 @@ export {
   unwrapReply,
 } from "./reply.ts";
 
-export { sendCommand, sendCommands } from "./command.ts";
+export { sendCommand, sendCommandsAndUnwrapReplies } from "./command.ts";
